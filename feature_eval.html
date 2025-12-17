@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Add Suppliers</title>
+  <style>
+    :root{--bg:#F1F3F7;--card:#E5E8FF;--input:#FFFFFF;--border:#D2D5DA;--primary:#91B3FA;--save:#2A00B2;--error:#DC2626}
+    body{margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;background:var(--bg);color:#111}
+    .wrap{max-width:980px;margin:32px auto;padding:16px}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+    .back{cursor:pointer;font-size:20px;line-height:1;padding:6px;border-radius:6px}
+    .card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 6px 18px rgba(10,10,30,.08)}
+    .grid{display:flex;gap:16px}
+    .left{flex:3}
+    .right{flex:2}
+    label{display:block;margin-bottom:6px;font-weight:600}
+    .required{color:var(--error);margin-left:4px}
+    input[type=text], select{width:100%;padding:10px;border:2px solid var(--border);border-radius:6px;background:var(--input);box-sizing:border-box}
+    .row{display:flex;gap:12px}
+    .row .col{flex:1}
+    .actions{display:flex;gap:8px;margin-top:12px}
+    .btn{padding:10px 14px;border-radius:6px;border:0;cursor:pointer}
+    .btn.add{background:var(--primary);color:#000}
+    .btn.cancel{background:#fff;border:2px solid var(--border)}
+    .preview-card{background:#F2F2F2;padding:10px;border-radius:8px;position:relative;margin-bottom:10px}
+    .close{position:absolute;right:8px;top:8px;cursor:pointer;background:transparent;border:0;font-size:16px}
+    .save-all{background:var(--save);color:#fff;padding:10px;border-radius:6px;border:0;width:100%;cursor:pointer}
+    .errors{color:var(--error);font-size:13px;margin-top:6px}
+    .hidden{display:none}
+    @media(max-width:767px){.grid{flex-direction:column}.right{order:-1}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <button id="backBtn" class="back" aria-label="Back">←</button>
+      <h2 style="margin:0">Add Suppliers</h2>
+    </header>
+
+    <div class="card">
+      <div id="mainGrid" class="grid">
+        <div class="left">
+          <form id="supplierForm" novalidate>
+            <div style="margin-bottom:12px">
+              <label for="name">Supplier Name <span class="required">*</span></label>
+              <input id="name" name="name" type="text" required>
+              <div id="err-name" class="errors"></div>
+            </div>
+
+            <div style="margin-bottom:12px">
+              <label for="supplierId">Supplier ID <span class="required">*</span></label>
+              <input id="supplierId" name="supplierId" type="text" maxlength="8" required>
+              <div id="err-supplierId" class="errors"></div>
+            </div>
+
+            <div style="margin-bottom:12px">
+              <label for="address1">Address Line 1 <span class="required">*</span></label>
+              <input id="address1" name="address1" type="text" required>
+              <div id="err-address1" class="errors"></div>
+            </div>
+
+            <div style="margin-bottom:12px">
+              <label for="address2">Address Line 2 <span class="required">*</span></label>
+              <input id="address2" name="address2" type="text" required>
+              <div id="err-address2" class="errors"></div>
+            </div>
+
+            <div style="margin-bottom:12px">
+              <label>Contact Number <span class="required">*</span></label>
+              <div class="row">
+                <div class="col" style="flex:0 0 130px">
+                  <select id="countryCode" required>
+                    <option value="+971">+971 UAE</option>
+                    <option value="+1">+1 USA</option>
+                    <option value="+44">+44 UK</option>
+                    <option value="+91">+91 India</option>
+                  </select>
+                </div>
+                <div class="col">
+                  <input id="phone" name="phone" type="text" inputmode="numeric" pattern="[0-9]*" required placeholder="501234567">
+                </div>
+              </div>
+              <div id="err-phone" class="errors"></div>
+            </div>
+
+            <div class="actions">
+              <button type="button" id="addBtn" class="btn add">Add</button>
+              <button type="button" id="cancelBtn" class="btn cancel">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="right" id="previewSection">
+          <div id="previewList"></div>
+          <div id="saveWrap" class="hidden" style="margin-top:8px">
+            <button id="saveAllBtn" class="save-all">Save All</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function loadJSON(key){try{const v=localStorage.getItem(key);return v?JSON.parse(v):[];}catch(e){alert('Failed reading '+key);console.error(e);return []}}
+    function saveJSON(key,val){try{localStorage.setItem(key,JSON.stringify(val));return true}catch(e){alert('Failed saving '+key);console.error(e);return false}}
+
+    const backBtn = document.getElementById('backBtn');
+    const previewSection = document.getElementById('previewSection');
+    const previewList = document.getElementById('previewList');
+    const saveWrap = document.getElementById('saveWrap');
+    const saveAllBtn = document.getElementById('saveAllBtn');
+
+    const form = document.getElementById('supplierForm');
+    const nameIn = document.getElementById('name');
+    const supplierIdIn = document.getElementById('supplierId');
+    const address1In = document.getElementById('address1');
+    const address2In = document.getElementById('address2');
+    const countryCodeIn = document.getElementById('countryCode');
+    const phoneIn = document.getElementById('phone');
+
+    const err = id => document.getElementById('err-'+id);
+
+    function getUserIdFromPath(){
+      const parts = location.pathname.split('/').filter(Boolean);
+      const idx = parts.indexOf('suppliers');
+      if(idx>=0 && parts.length>idx+1){return parts[idx+1]}
+      try{const u = localStorage.getItem('currentUserId'); if(u) return u}catch(e){}
+      return 'me'
+    }
+
+    const userId = getUserIdFromPath();
+    function suppliersListUrl(){ return '/app/settings/suppliers/'+encodeURIComponent(userId); }
+
+    backBtn.addEventListener('click', ()=>{
+      const temps = loadJSON('tempSuppliers')||[];
+      if(temps.length){
+        if(!confirm('You have unsaved suppliers. Leave and lose them?')) return;
+      }
+      location.href = suppliersListUrl();
+    });
+
+    function clearErrors(){['name','supplierId','address1','address2','phone'].forEach(k=>err(k).textContent='')}
+
+    function validate(){
+      clearErrors();
+      if(!nameIn.value.trim()){err('name').textContent='Required'; nameIn.focus(); return false}
+      if(!supplierIdIn.value || supplierIdIn.value.trim().length!==8){err('supplierId').textContent='Supplier ID must be 8 characters'; supplierIdIn.focus(); return false}
+      if(!address1In.value.trim()){err('address1').textContent='Required'; address1In.focus(); return false}
+      if(!address2In.value.trim()){err('address2').textContent='Required'; address2In.focus(); return false}
+      const phoneRaw = (phoneIn.value||'').replace(/\D/g,'');
+      if(phoneRaw.length<9 || phoneRaw.length>15){err('phone').textContent='Please enter a valid phone number (9–15 digits)'; phoneIn.focus(); return false}
+      return true
+    }
+
+    function renderPreview(){
+      const temps = loadJSON('tempSuppliers')||[];
+      previewList.innerHTML='';
+      if(!temps.length){ previewSection.classList.add('hidden'); saveWrap.classList.add('hidden'); return }
+      previewSection.classList.remove('hidden'); saveWrap.classList.remove('hidden');
+      temps.forEach(s=>{
+        const d = document.createElement('div'); d.className='preview-card';
+        d.innerHTML = `<strong>${escapeHtml(s.name)}</strong><button class="close" aria-label="Remove supplier" data-id="${s.id}">×</button>
+          <div style="margin-top:8px;font-size:13px">ID: ${escapeHtml(s.supplierId)}</div>
+          <div style="font-size:13px">${escapeHtml(s.address1)}${s.address2?', '+escapeHtml(s.address2):''}</div>
+          <div style="font-size:13px">Contact: ${escapeHtml(s.fullContact)}</div>`;
+        previewList.appendChild(d);
+      });
+      previewList.querySelectorAll('.close').forEach(btn=>btn.addEventListener('click', e=>{
+        const id = e.currentTarget.getAttribute('data-id'); removeTempSupplier(id);
+      }));
+    }
+
+    function escapeHtml(s){return (s+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+    function addTempSupplier(supp){
+      const temps = loadJSON('tempSuppliers')||[];
+      temps.push(supp);
+      if(saveJSON('tempSuppliers',temps)) renderPreview();
+    }
+
+    function removeTempSupplier(id){
+      let temps = loadJSON('tempSuppliers')||[];
+      temps = temps.filter(t=>t.id!==id);
+      saveJSON('tempSuppliers',temps); renderPreview();
+    }
+
+    document.getElementById('addBtn').addEventListener('click', ()=>{
+      if(!validate()) return;
+      const phoneRaw = (phoneIn.value||'').replace(/\D/g,'');
+      const obj = {
+        id: 'TS-'+Date.now(),
+        name: nameIn.value.trim(),
+        supplierId: supplierIdIn.value.trim(),
+        address1: address1In.value.trim(),
+        address2: address2In.value.trim(),
+        countryCode: countryCodeIn.value,
+        phone: phoneRaw,
+        fullContact: countryCodeIn.value + '-' + phoneRaw
+      };
+      addTempSupplier(obj);
+      form.reset();
+    });
+
+    document.getElementById('cancelBtn').addEventListener('click', ()=>{ form.reset(); clearErrors(); });
+
+    saveAllBtn.addEventListener('click', ()=>{
+      const temps = loadJSON('tempSuppliers')||[];
+      if(!temps.length){ alert('No suppliers to save'); return }
+      let suppliers = loadJSON('suppliers')||[];
+      const existingIds = new Set(suppliers.map(s=>s.supplierId));
+      const toAdd = temps.filter(t=>!existingIds.has(t.supplierId));
+      suppliers = suppliers.concat(toAdd);
+      if(!saveJSON('suppliers',suppliers)){ alert('Failed saving suppliers'); return }
+      saveJSON('tempSuppliers',[]);
+      alert('Saved '+toAdd.length+' new supplier(s).');
+      location.href = suppliersListUrl();
+    });
+    renderPreview();
+    if((loadJSON('tempSuppliers')||[]).length===0){ previewSection.classList.add('hidden'); saveWrap.classList.add('hidden') }
+  </script>
+</body>
+</html>
